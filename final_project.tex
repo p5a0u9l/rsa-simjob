@@ -1,0 +1,370 @@
+\documentclass[conference]{/Users/paul/MSEE/ee595/project/report/IEEEtran/IEEEtran}
+ 
+% Some very useful LaTeX packages include:
+% (uncomment the ones you want to load)
+\setlength{\parindent}{4em}
+\setlength{\parskip}{1em}
+\usepackage{cite}
+\usepackage{amssymb}
+\usepackage{pdflscape}
+\usepackage{courier}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+\usepackage{amsmath}
+\usepackage{minted}
+\usepackage[justification=justified,font=footnotesize]{caption}
+\ifCLASSINFOpdf
+  \usepackage[pdftex]{graphicx}
+  % declare the path(s) where your graphic files are
+  \graphicspath{figures}
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.pdf,.jpeg,.png}
+\else
+  % and their extensions so you won't have to specify these with
+  % every instance of \includegraphics
+  % \DeclareGraphicsExtensions{.eps}
+\fi
+ 
+%\usepackage{algorithmic}
+%\usepackage{array}
+ 
+\ifCLASSOPTIONcompsoc
+  \usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+\else
+  \usepackage[caption=false,font=footnotesize]{subfig}
+\fi
+\pagenumbering{arabic} 
+
+\usepackage{url}
+
+
+\begin{document}
+%
+% paper title
+% Titles are generally capitalized except for words such as a, an, and, as,
+% at, but, by, for, in, nor, of, on, or, the, to and up, which are usually
+% not capitalized unless they are the first or last word of the title.
+% Linebreaks \\ can be used within to get better formatting as desired.
+% Do not put math or special symbols in the title.
+\title{A Survey of Random Numbers in Cryptography}
+
+
+% author names and affiliations
+% use a multiple column layout for up to three different
+% affiliations
+\author{\IEEEauthorblockN{Paul Adams}
+\IEEEauthorblockA{University of Washington\\
+    Department of Electrical Engineering\\
+    EE 595 Advanced Topics in Communication Theory\\
+Winter 2016\\
+}}
+
+% make the title area
+\maketitle
+
+% in the abstract
+\begin{abstract}
+    Random number generators (RNG) are a central element of almost any information system's security profile. As an example, they are often used to bootstrap trust between two communicating digital entities. This project set out to be a survey of RNGs in cryptographical applications, but ended up as more of a meander. While a few different topics were explored, including examples of good and bad software and hardware RNGs, in addition to methods for testing quality of RNGs, an exercise was eventually found which tied together the criticality of robust entropy sources for real-world applications. In this case, an RSA simulation was created to demonstrate the catastrophic failure arising from using inadequate random streams. 
+\end{abstract}
+
+ 
+\section{Introduction}
+% no \IEEEPARstart
+    The first question we might ask is how to establish the quality of a random number generator. In order to evaluate the qualities of a random stream, we should have an understanding of the characteristics that secure cryptosystems share. 
+    
+    While mostly a philosophical question, it is relevant to cryptography that our understanding of randomness is \textit{via negativa}. One might ask, does random exist as something more than simply the name we assign to uncorrelated observations? In the context of testing random numbers, software will run a suite of tests that verify the stream does not have any known bad qualities. That is, the tests demonstrate necessary but insufficient qualities of RNGs. Fundamentally, the nature of a random stream is that it's elements defy correlation and consequently there exists no exhaustive set of conditions to describe perfect randomness given a finite set of observations. 
+ 
+    In short, we say that a random stream must be completely unpredictable. This fits well with the intuitive sense that secrets shouldn't be guessable. To this end, a common test of RNG performance is the \textit{next bit test}, wherein it is verified that given every entry of an $$n$$ - bit stream, predicting $$n + 1$$ is equiprobable for any $$n$$. 
+ 
+I propose that observations meeting the following conditions are unpredictable.
+  
+\begin{itemize}
+    \item equally likely 
+    \item independent
+\end{itemize}
+ 
+To generate observations meeting the above conditions, we require a source of entropy. In an information theoretic sense, entropy is simply the information density of a stream. The entropy of a perfectly random stream should be equal to the length of the stream. In practice, only hardware RNGs can truly meet these conditions in the limit. 
+ 
+In practical cryptosystems, sourcing entropy from natural processes via hardware RNGs is too costly. For this reason the majority of cryptosystems use entropy sourced from an algorithm and implemented with software. The algorithms that generate these random numbers are inherently deterministic and fundamentally lack the required conditions proposed above. The design then attempts to appear random for as long as possible and are thus designated Pseudo-random number generators (PRNG). 
+ 
+Due to their formulaic nature, PRNGs must meet an additional condition to achieve 
+reasonable unpredictability
+ 
+\begin{itemize}
+    \item equally likely 
+    \item independent
+    \item unknown (hidden) state
+\end{itemize}
+
+If the state of a pseudo-random stream is known or can be guessed, then all 
+following numbers are immediately known. We can describe the state of a PRNG as 
+a combination of the algorithm and some reference point in the stream. The first 
+describes how the random samples are generated, while the second reveals where 
+in the stream the current iteration sits. Typically, the initial value, or the 
+seed, provides this reference. Further, since the space of cryptographically 
+robust PRNG algorithms is relatively small, it is possible to guess the 
+algorithm, or a close-enough variant through brute-force methods. This makes the 
+seed value the critical component of the state. 
+ 
+\section{RANDU}
+ 
+\subsection{Description}
+RANDU is the classic example of an PRNG whose output is uniformly distributed but
+whose samples are not independent. It is defined with the following recurrence 
+relation:
+    Given an initial seed $$V_0$$, subsequent numbers are given as
+ 
+\begin{equation}
+    V_{j+1} = 65539 \cdot V_j \mod 2^{31}
+\end{equation}
+ 
+The numbers generated are uniformly distributed over $$[1,...,2^{31} - 1]$$
+yet fall into a pattern when grouped into tuples of three or more. Figure 1 shows
+the distribution as points in a three-dimensional grid at various camera angles.
+
+In the first, the points appear to be evenly distributed over the space. In the
+second, a pattern is beginning to appear, while the third shows the numbers 
+aligning into planes. 
+
+\begin{figure}[h]
+    \captionsetup{width=0.5\linewidth}
+    \subfloat{\includegraphics[width=3.0in]{figures/randu_good.png}%
+    \label{fig_first_case}} \\[-2ex]
+    \subfloat{\includegraphics[width=3.0in]{figures/randu_less.png}%
+    \label{fig_second_case}} \\[-2ex]
+    \subfloat{\includegraphics[width=3.0in]{figures/randu_bad.png}%
+    \label{fig_third_case}}
+    \caption{RANDU Generated Numbers in 3-Tuples at Various Angles}
+\end{figure}
+
+This example of failing the \href{https://en.wikipedia.org/wiki/Spectral_test}{spectral test} holds for all dimensions greater than 2. It also points to the necessary property of PRNGs that in addition to having uniform distributions, the numbers must be free of correlations. In the case of the RANDU generator the numbers clearly fall into planes. 
+
+\section{RSA Simulation with Bad PRNG}
+It is easy to ask why a robust random stream actually matters when there are sophisticated and vetted algorithms that seem to do the heavy lifting. After all, in the case of RSA, the random number generator provides only the initial boost before creating very large numbers that are near impossible to factor. 
+
+    In order to test the effects of an unreliable random stream, I designed an RSA protocol simulation programmed in the julia language [1] to mimic a practical application. 
+
+\subsection{Scenario}
+To tie the problem to a realistic setting, the following scenario is given.
+ 
+    A small online investment startup has contracted with an affordable, and new, security firm to provide secure, randomized passwords for its customers. While the passwords themselves are generated with a decent PRNG, the security firm struggles with the startup's request to use RSA instead of their preferred elliptic curve based algorithms. Due to scheduling pressures, they opt to re-appropriate an open-source protocol purporting to implement a secure
+RSA protocol. While the security firm attempts to do due diligence on the implementation, they overlook testing the quality of the built-in random number generator. 
+
+    Additionally, an adversary, Eve, has discovered a vulnerability in the startup's network implementation that allows her to intercept and cache all outgoing messages from the startup. Caching the RSA encrypted passwords along with their respective moduli allows her to perform offline processing to test the strength of the encryption used by the investment startup. 
+
+\subsection{Forward Problem}
+The program has two primary steps, which I will to refer to as the forward problem, wherein a large set of RSA channels is generated, and the inverse problem, wherein offline processing is used to break the system. 
+
+For context, in an RSA scheme the encryption and decryption functions are given, respectively, as
+
+\begin{align}
+    c = E_k(m, e) = m^e \mod n\\
+    m = D_k(c, d) = c^d \mod n
+\end{align}
+where $$m$$ is the message, $$e$$ is the public key, $$n$$ is the modulus, $$d$$ is the private key, and $$c$$ is the cipher. 
+
+    Simulation of the generation and transmission of secure passwords to customers program contains a function to generate a large number of RSA ciphers, composed of ten character random passwords, and then cache the details to a file for post-processing. Each message creates a new channel, generating a set of public/private keys along with the modulus. The figure below illustrates one cycle of the forward problem.
+Additionally, for each message, the modulus and cipher are observed by Eve and cached. 
+ 
+\begin{figure}[h]
+    \includegraphics[width=3.6in]{figures/block_diag.png}%
+    \caption{Forward Problem}
+\end{figure}
+ 
+\subsection{PRNG Vulnerability}
+From Fig. 2, it can be seen that the private key is a function of the randomly generated primes $$p$$ and $$q$$. Specifically, 
+\begin{align}
+    n = pq && \text{ modulus } \\
+    \phi = (p-1)(q-1) && \text{ totient } \\
+    d = e^{-1} \mod \phi && \text{ private key }
+\end{align}
+ 
+Herein lies the vulnerability introduced by a bad PRNG. If by chance two separate moduli share a common factor, the private key for both channels can easily be deduced, as discussed in more detail in the following section. 
+
+    Ordinarily, under 1028-bit strength, a collision of prime factors would occur with probability nearly zero. However, this assumes a cryptographically secure PRNG. With a bad random stream feeding $$p$$'s and $$q$$'s, the probability of collision is increased significantly. This effect was surveyed in detail in the seminal research of Heninger \textit{et al.} [2]. The researchers harvested a large collection of public keys from RSA and DSA for TLS and SSH hosts and then sought for non-trivial moduli. In the case of RSA for TLS hosts, the private keys of 0.50 \% were recovered due to random streams with insufficient entropy.  
+
+\subsection{Inverse Problem}
+ 
+\begin{figure}[h]
+    \includegraphics[width=3.6in]{figures/inverse.png}%
+    \caption{Inverse Problem}
+\end{figure}
+ 
+Suppose Eve has found two independent moduli, $$n_i$$ and $$n_j$$ and has further found that they share a common factor by testing, 
+ 
+\begin{equation}
+    \text{GCD}(n_1, n_2) \neq 1
+\end{equation}
+ 
+As a side note, if she has many moduli, millions or more to test, it is not computationally infeasible to compute the pairwise greatest common denominator due to Euclid's extended algorithm. Security of RSA rests in the difficulty of factoring large numbers composed of primes. That is, given $$n$$, it is difficult to find $$p$$ and $$q$$. However, given two $$n$$'s, it is easy to compute their GCD. 
+
+For the pair above, it is straightforward to posit $$p = \text{GCD}(n_i, n_j)$$ and further, $$q_i = n_i/p$$ and $$q_j = n_j/p$$. Because the moduli share a common factor, it is trivial to find their respective $$p, q$$ pair. From these, the private key can be found using (5) and (6) and the cipher decrypted using (3). Put simply, if a pair of common factors is found for two moduli, the private keys for both channels are immediately compromised. 
+ 
+ 
+\subsection{Numerical Example of Compromise}
+ 
+Suppose 10 million channels are generated, each containing a private, public key pair, and a modulus. Over the RSA channel, a message is encrypted, transmitted, received, and decrypted with the private key. This process is mostly captured in Figure 2 and repeated here for context.
+
+Further suppose an adversary harvests the modulus and cipher associated with the 10 million RSA channels and begins to search the space for moduli with common prime factors. For this example, let the message be "6qNu0qfmsM", a randomly generated password and let the modulus bit depth be 31 bits. Making use of the function written for this purpose, we can display the output of the Julia prompt to show the corresponding encrypted elements 
+ 
+\begin{verbatim}
+ cipher = send_rsa("6qNu0qfmsM", pubkey, n)
+    10-element Array{BigInt,1}:
+         347800891852005865
+          42670716049858146
+         579594145838870300
+         275167124031112302
+         450351544165447506
+          42670716049858146
+         214153226707085291
+         341372119076152163
+         144771398172410886
+          62087393764008425
+\end{verbatim}
+ 
+Now, let the $$i^{th}, j^{th}$$ pair of moduli tested be, 
+\begin{align}
+    n_i = 776945765374771193\\
+    n_j = 682044630882172907
+\end{align}
+ 
+Taking the GCD of the above pair yields
+\begin{align}
+    q = 839262571
+\end{align}
+
+From here, we can easily compute the corresponding prime factors of both moduli as
+\begin{align}
+    p_i = \frac{776945765374771193}{839262571} = 812671157 \\
+    p_j = \frac{682044630882172907}{839262571} = 925747943
+\end{align}
+ 
+Supposing we are only interested in the message corresponding to the $$i^{th}$$ cipher, knowing the public key and using (3), we now compute its private key as, 
+ 
+\begin{align}
+    d = 1073741827^{-1} \mod 812671156 * 839262570\\
+    d = 505876514661585763
+\end{align}
+ 
+Given the private key, the cipher, and the modulus we can again make use of modular exponentiation and compute the first element of the cipher, 
+
+\begin{align}
+    m[1] = c[1]^d \mod n \\
+    54 = 347800891852005865^{505876514661585763} \mod n 
+\end{align}
+ 
+Using an ASCII lookup, the number 54 corresponds to the numeric digit "6", the first element of our secret password. Utilizing another routine from my purpose-built crypto library, the remaining elements are computed as  
+ 
+\begin{verbatim}
+julia> msg = recv_rsa(cipher, d, n)
+10-element Array{Char,1}:
+ '6'
+ 'q'
+ 'N'
+ 'u'
+ '0'
+ 'q'
+ 'f'
+ 'm'
+ 's'
+ 'M'
+ \end{verbatim}
+  
+Which matches the original message of "6qNu0qfmsM". Thus it can be seen that RSA fails catastrophically when two moduli are found with shared factors. It is emphasized that this event would be virtually nonexistent given 1028-bit moduli and high entropy sources of prime factors. In this case, the failure is due solely to a bad PRNG generating duplicate primes. 
+ 
+\subsection{Simulation Parameters and Implementation Notes}
+Given computing and time constraints, I limited the level of encryption 32 bits or less and used the RANDU PRNG. I used the outline of [3] for generating the channel keys, with the requirement that $$p, q$$ be co-prime with the public key. 
+
+    Additionally, an implementation of Euclid's extended algorithm was required for computing modular multiplicative inverses, as well as an implementation of modular exponentiation. For the latter, I used an adaptation of
+pseudo-code attributed to Bruce Schneier in the Wikipedia article for modular exponentiation [4]. 
+
+    Without a fast implementation of modular exponentiation the simulation of RSA would not have been feasible. I started with a naive computation, leveraging Julia's interface to Gnu MultiPrecision Library's \texttt{BigInt} data type. While using the \texttt{BigInt} type was necessary, given the size of the numbers, arbitrary precision arithmetic carried more computational overhead than was feasible to scale. Schneier's algorithm exploits bit-shifting to achieve computations similar
+to (1) in a few dozen iterations. 
+
+    An additional computational constraint had to do with the shared-factor search. Initially, I wrote a routine to search the entire key space pairwise. Even though computing the GCD of arbitrarily large numbers is very fast, the space is large. If $$N$$ moduli are generated, the unique, pairwise space is given as
+     
+\begin{equation} 
+    \sum_{i=1}^{N}i
+\end{equation} 
+ 
+For $$N = 1000000$$ this amounts to $$500000500000$$ GCD operations. Heninger, \textit{et al.}, achieve greater efficiency using a special algorithm, but that level of effort seemed outside the scope of this paper.  Therefore, for the purpose of the simulation, I varied the level of encryption bits until a sample set on the order of 1-10 million moduli could be identified where the number of unique $$p, q$$ pairs was less than the total number of pairs. This would imply shared factors and allow
+me to back out the decryption on a per case basis rather than testing every one. That is, given this is a simulation and I have $$p, q$$ in hand, it is much easier to check for duplicates than it is to compute the pairwise GCD over the entire set.   
+
+    After the forward and inverse routines were programmed and then tuned for efficient use, I found that generating 1-10 million RSA channels took around 30 minutes on my 7 year-old Macbook Pro. Solving the inverse problem was much quicker for the reasons outlined in the above paragraph. This sort of time scale allowed for multiple iterations with different parameters. 
+ 
+\section{Discussion of Results}
+ 
+\begin{figure}[h]
+    \includegraphics[width=3.6in]{figures/results.png}%
+    \caption{RSA Sim Results}
+\end{figure}
+ 
+Using the RANDU PRNG, collisions of primes occurred greater than half the time for most cases. I ran the simulation using various bit depths, 28-32 as seen in figure 4. Clearly the number of compromised keys decreased as the number of bits in the modulus increased. For each independent RSA channel there are two moduli and four large primes, therefore each channel presents two opportunities for failure. These numbers are represented in the columns labeled, "Unique Primes" and "Total
+Primes". Given a PRNG with sufficient entropy, all the primes should be unique. 
+
+Due to an indexing bug the total number of primes generated was less than the intended value of 25 million, however the percentage of compromised channels is still accurate. It can be seen that with a space of approximately 25 million primes, 32 bits of modulus depth there are no collisions. However, increasing the space to nearly 200 million primes caused it to fail spectacularly. 
+
+After running the tests that generated the above results, I attempted to find a collision with a more robust PRNG. I chose the Mersenne twister algorithm, which is not considered cryptographically secure, but is nevertheless a robust PRNG. With a space of 200 million primes there was not one collision. This is not surprising and underlines the characteristic of PRNGs that when one fails, it is not subtle. A lesson similar is that quality of PRNGs is not measured in degrees but decibels. Typically a bad PRNG fails very quickly, whereas one that is robust, but not quite the caliber needed for cryptography takes several orders of magnitude more effort to expose its weakness. 
+
+\section{Conclusion}
+My somewhat random walk through randomness in cryptography included additional stops at the NIST Randomness Beacon, which makes full entropy bits available on the web using quantum observations, and the TestU01 c library of PRNG tests. I initially had intended to study and characterize traits of a spectrum of software and hardware RNGs. This led naturally to wondering just how insufficient randomness can affect practical security applications. The research by Heninger \textit{et al} conducted the first harvest and analysis of a long known weak spot in RSA and provided the surprising results that even in 2012, when much of the theory of software sourced generators and OS-sourced entropy is well-developed and understood, a non-trivial fraction of internet hosts use their random numbers in a way that enables RSA to fail. 
+
+By simulating an RSA implementation and testing the effect of insufficiently random primes, I was able to tie the theory to a practical application and gain a much deeper appreciation for proper implementation of cryptosystems. Even otherwise robust and secure systems like RSA can fail spectacularly when carelessly implemented. 
+
+
+% trigger a \newpage just before the given reference
+% number - used to balance the columns on the last page
+% adjust value as needed - may need to be readjusted if
+% the document is modified later
+%\IEEEtriggeratref{8}
+% The "triggered" command can be changed if desired:
+%\IEEEtriggercmd{\enlargethispage{-5in}}
+
+% references section
+
+% can use a bibliography generated by BibTeX as a .bbl file
+% BibTeX documentation can be easily obtained at:
+% http://mirror.ctan.org/biblio/bibtex/contrib/doc/
+% The IEEEtran BibTeX style support page is at:
+% http://www.michaelshell.org/tex/ieeetran/bibtex/
+%\bibliographystyle{IEEEtran}
+% argument is your BibTeX string definitions and bibliography database(s)
+%\bibliography{IEEEabrv,../bib/paper}
+%
+% <OR> manually copy in the resultant .bbl file
+% set second argument of \begin to the number of references
+% (used to reserve space for the reference number labels box)
+\begin{thebibliography}{1}
+    \bibitem{Julia}
+        http://julialang.org
+         
+    \bibitem{Heninger}
+        N.~Heninger, Z.~Durumeric,E.~Wustrow,J.~Halderman, \emph{Mining Your Ps and Qs: Detection of Widespread Weak Keys in Network Devices}
+
+    \bibitem{Kak}
+    A.~Kak \emph{Lecture 12: Public-Key Cryptography and the RSA Algorithm}
+    \url{https://engineering.purdue.edu/kak/compsec/NewLectures/Lecture12.pdf}
+     
+    \bibitem{modexp}
+        B.~Schneier \url{https://en.wikipedia.org/wiki/Modular_exponentiation}
+\end{thebibliography}
+
+\onecolumn
+\newpage
+
+\section{Code Listings}
+\subsection{RSA Simulation}
+\inputminted{julia}{../code/rsa_sim.jl}
+ 
+\subsection{My Crypto Lib}
+\inputminted{julia}{../code/my_crypto.jl}
+ 
+\subsection{Rabbit}
+\inputminted{julia}{../code/rabbit.jl}
+% that's all folks
+\end{document}
